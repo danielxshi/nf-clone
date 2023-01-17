@@ -1,0 +1,1 @@
+export const baseUrl = 'https://image.tmbd.org/t/p/original'
