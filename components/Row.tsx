@@ -2,12 +2,13 @@ import React, { useState, useRef } from 'react'
 import { Movie } from '@/typings'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid'
 import Thumbnail from './Thumbnail'
+import { DocumentData } from 'firebase/firestore'
 
 interface Props {
     // When using Firebase
-    // movie: Movie | DocumentData
+    movies: Movie[] | DocumentData[]
     title: string
-    movies: Movie[]
+
 }
 
 
@@ -41,7 +42,7 @@ function Row({ title, movies }: Props) {
                     ))}
 
                 </div>
-                <ChevronRightIcon className={`absolute top-0 bottom-0 right-2 z-40 m-auto h-9 w-9 cursor-pointer opacity-0 transition hover:scale-125 group-hover:opacity-100`}onClick={() => handleClick('right')} />
+                <ChevronRightIcon className={`absolute top-0 bottom-0 right-2 z-40 m-auto h-9 w-9 cursor-pointer opacity-0 transition hover:scale-125 group-hover:opacity-100`} onClick={() => handleClick('right')} />
             </div>
         </div>
     )

@@ -1,18 +1,33 @@
 import MuiModal from "@mui/material/Modal"
 import { useRecoilValue, useRecoilState } from "recoil"
 import { modalState, movieState } from "@/atoms/modalAtom"
-import { HandThumbUpIcon, PlusIcon, XMarkIcon } from "@heroicons/react/24/solid"
+import { CheckIcon, HandThumbUpIcon, PlusIcon, XMarkIcon } from "@heroicons/react/24/solid"
 import { useEffect, useState } from "react"
-import { Element, Genre } from "@/typings"
+import { Element, Genre, Movie } from '../typings'
 import ReactPlayer from "react-player/lazy"
 import { FaPlay, FaVolumeOff, FaVolumeUp } from "react-icons/fa"
+import {
+    collection,
+    deleteDoc,
+    doc,
+    DocumentData,
+    onSnapshot,
+    setDoc,
+} from 'firebase/firestore'
+import { db } from "@/firebase"
+import useAuth from '../hooks/useAuth'
+import toast, { Toaster } from "react-hot-toast"
+
 
 function Modal() {
-    const [showModal, setShowModal] = useRecoilState(modalState)
     const [movie, setMovie] = useRecoilState(movieState)
-    const [trailer, setTrailer] = useState("")
-    const [genres, setGenres] = useState<Genre[]>([])
+    const [trailer, setTrailer] = useState('')
+    const [showModal, setShowModal] = useRecoilState(modalState)
     const [muted, setMuted] = useState(true)
+    const [genres, setGenres] = useState<Genre[]>([])
+    const [addedToList, setAddedToList] = useState(false)
+    const { user } = useAuth()
+    const [movies, setMovies] = useState<DocumentData[] | Movie[]>([])
 
 
     useEffect(() => {
@@ -23,21 +38,70 @@ function Modal() {
                 `https://api.themoviedb.org/3/${movie?.media_type === 'tv' ? 'tv' : 'movie'
                 }/${movie?.id}?api_key=${process.env.NEXT_PUBLIC_API_KEY
                 }&language=en-US&append_to_response=videos`
-            )
-                .then((response) => response.json())
-                .catch(err => console.log(err.message))
-
+            ).then((response) => response.json())
             if (data?.videos) {
-                const index = data.videos.results.findIndex((element: Element) => element.type === "Trailer")
+                const index = data.videos.results.findIndex(
+                    (element: Element) => element.type === 'Trailer'
+                )
                 setTrailer(data.videos?.results[index]?.key)
             }
             if (data?.genres) {
                 setGenres(data.genres)
             }
         }
+
         fetchMovie()
     }, [movie])
 
+    // Find all the movies in the user's list
+    useEffect(() => {
+        if (user) {
+            return onSnapshot(
+                collection(db, 'customers', user.uid, 'myList'),
+                (snapshot) => setMovies(snapshot.docs)
+            )
+        }
+    }, [db, movie?.id])
+
+    // Check if the movie is already in the user's list
+    useEffect(
+        () =>
+            setAddedToList(
+                movies.findIndex((result) => result.data().id === movie?.id) !== -1
+            ),
+        [movies]
+    )
+
+    const handleList = async () => {
+        if (addedToList) {
+            await deleteDoc(
+                doc(db, 'customers', user!.uid, 'myList', movie?.id.toString()!)
+            )
+
+            toast(
+                `${movie?.title || movie?.original_name} has been removed from My List`,
+                {
+                    duration: 8000,
+                    // style: toastStyle,
+                }
+            )
+        } else {
+            await setDoc(
+                doc(db, 'customers', user!.uid, 'myList', movie?.id.toString()!),
+                {
+                    ...movie,
+                }
+            )
+
+            toast(
+                `${movie?.title || movie?.original_name} has been added to My List.`,
+                {
+                    duration: 8000,
+                    // style: toastStyle,
+                }
+            )
+        }
+    }
 
 
     const handleClose = () => {
@@ -49,6 +113,7 @@ function Modal() {
             className="fixed !top-7 left-0 right-0 z-50 mx-auto w-full max-w-5xl overflow-hidden overflow-y-scroll rounded-md scrollbar-hide"
         >
             <>
+                <Toaster position="bottom-center" />
                 <button onClick={handleClose} className="modalButton absolute right-5 top-5 !z-40 h-9 w-9 border-none bg-[#181818]">
                     <XMarkIcon className="h-6 w-6" />
                 </button>
@@ -67,8 +132,13 @@ function Modal() {
                                 <FaPlay className="h-7 w-7 text-black" />
                                 Play
                             </button>
-                            <button className="modalButton">
-                                <PlusIcon className="h-7 w-7" />
+                            <button onClick={handleList} className="modalButton">
+                                {addedToList ? (
+                                    <CheckIcon className="h-7 w-7" />
+                                ) : (
+                                    <PlusIcon className="h-7 w-7" />
+                                )}
+                                {/* <PlusIcon className="h-7 w-7" /> */}
                             </button>
                             <button className="modalButton">
                                 <HandThumbUpIcon className="h-7 w-7" />
@@ -109,7 +179,7 @@ function Modal() {
                                     </div>
 
                                     <div className="text-[gray]">
-                                        <span className="text-[gray]">Total votes: </span> 
+                                        <span className="text-[gray]">Total votes: </span>
                                         {movie?.vote_count}
                                     </div>
                                 </div>
